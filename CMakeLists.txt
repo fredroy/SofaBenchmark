@@ -37,6 +37,9 @@ list(APPEND SOURCE_FILES
     ${SOFABENCHMARK_SRC}/benchmarks/SofaHelper/AdvancedTimer.cpp
     ${SOFABENCHMARK_SRC}/benchmarks/SofaHelper/MapPtrStableCompare.cpp
     ${SOFABENCHMARK_SRC}/benchmarks/Sofa.LinearAlgebra/SparseMatrixProduct.cpp
+    ${SOFABENCHMARK_SRC}/benchmarks/Sofa.Geometry/Edge.cpp
+    ${SOFABENCHMARK_SRC}/benchmarks/Sofa.Geometry/Tetrahedron.cpp
+    ${SOFABENCHMARK_SRC}/benchmarks/Sofa.Geometry/Triangle.cpp
     ${SOFABENCHMARK_SRC}/benchmarks/Sofa.Type/fixed_array.cpp
     ${SOFABENCHMARK_SRC}/benchmarks/Sofa.Type/Vec.cpp
     ${SOFABENCHMARK_SRC}/benchmarks/Sofa.Type/Matrix.cpp

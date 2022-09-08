@@ -27,6 +27,10 @@ static void BM_Matrix_eigenmatf_vecmult(benchmark::State& state);
 static void BM_Matrix_typemat3x3f_assign(benchmark::State& state);
 static void BM_Matrix_eigenmat33_assign(benchmark::State& state);
 
+
+static void BM_Matrix_typemat3x3f_noconstexpr_bench(benchmark::State& state);
+static void BM_Matrix_typemat3x3f_constexpr_bench(benchmark::State& state);
+
 constexpr int64_t minSubIterations = 8 << 4;
 constexpr int64_t maxSubIterations = 8 << 6;
 
@@ -49,6 +53,9 @@ BENCHMARK_TEMPLATE(BM_Matrix_eigenmatf_vecmult, 3)->RangeMultiplier(2)->Ranges({
 BENCHMARK_TEMPLATE(BM_Matrix_eigenmatf_vecmult, 24)->RangeMultiplier(2)->Ranges({ {minSubIterations, maxSubIterations} })->Unit(benchmark::kMicrosecond);
 BENCHMARK(BM_Matrix_typemat3x3f_assign)->RangeMultiplier(2)->Ranges({ {minSubIterations, maxSubIterations} })->Unit(benchmark::kMicrosecond);
 BENCHMARK(BM_Matrix_eigenmat33_assign)->RangeMultiplier(2)->Ranges({ {minSubIterations, maxSubIterations} })->Unit(benchmark::kMicrosecond);
+
+BENCHMARK(BM_Matrix_typemat3x3f_noconstexpr_bench)->RangeMultiplier(2)->Ranges({ {minSubIterations, maxSubIterations} })->Unit(benchmark::kMicrosecond);
+BENCHMARK(BM_Matrix_typemat3x3f_constexpr_bench)->RangeMultiplier(2)->Ranges({ {minSubIterations, maxSubIterations} })->Unit(benchmark::kMicrosecond);
 
 void BM_Matrix_typemat3x3f_construct(benchmark::State& state)
 {
@@ -456,5 +463,41 @@ void BM_Matrix_eigenmat33_invert(benchmark::State& state)
             Eigen::Matrix3f inv = mat.inverse();
             benchmark::DoNotOptimize(inv);
         }
+    }
+}
+
+void BM_Matrix_typemat3x3f_constexpr_bench(benchmark::State& state)
+{
+    constexpr auto totalsize = 9;
+    constexpr auto values = CompileTimeRandomValuePool<float, totalsize>::get();
+
+    constexpr sofa::type::Mat3x3f mat{
+                sofa::type::Mat3x3f::LineNoInit{values[0], values[1], values[2]},
+                sofa::type::Mat3x3f::LineNoInit{values[3], values[4], values[5]},
+                sofa::type::Mat3x3f::LineNoInit{values[6], values[7], values[8]}
+            };
+
+    for (auto _ : state)
+    {
+        constexpr sofa::type::Mat3x3f res = mat.inverted() * mat.transposed() * mat.inverted() * mat.inverted() * mat.transposed() * mat.inverted() * mat.transposed() * mat.inverted() / 3.0f;
+        benchmark::DoNotOptimize(res);
+    }
+}
+
+void BM_Matrix_typemat3x3f_noconstexpr_bench(benchmark::State& state)
+{
+    constexpr auto totalsize = maxSubIterations * 9;
+    const auto values = RandomValuePool<float, totalsize>::get();
+
+    sofa::type::Mat3x3f mat{
+                sofa::type::Mat3x3f::LineNoInit{values[0], values[1], values[2]},
+                sofa::type::Mat3x3f::LineNoInit{values[3], values[4], values[5]},
+                sofa::type::Mat3x3f::LineNoInit{values[6], values[7], values[8]}
+    };
+
+    for (auto _ : state)
+    {
+        sofa::type::Mat3x3f res = mat.inverted() * mat.transposed() * mat.inverted() * mat.inverted() * mat.transposed() * mat.inverted() * mat.transposed() * mat.inverted() / 3.0f;
+        benchmark::DoNotOptimize(res);
     }
 }

@@ -13,6 +13,8 @@ static void BM_Matrix_eigenmat33_construct(benchmark::State& state);
 static void BM_Matrix_typemat3x3f_transpose(benchmark::State& state);
 static void BM_Matrix_eigenmat33_transpose(benchmark::State& state);
 static void BM_Matrix_typemat3x3f_invert(benchmark::State& state);
+static void BM_Matrix_typemat3x3d_invert(benchmark::State& state);
+static void BM_Matrix_typemat6x6d_invert(benchmark::State& state);
 static void BM_Matrix_eigenmat33_invert(benchmark::State& state);
 static void BM_Matrix_typemat3x3f_determinant(benchmark::State& state);
 static void BM_Matrix_eigenmat33_determinant(benchmark::State& state);
@@ -40,6 +42,8 @@ BENCHMARK(BM_Matrix_eigenmat33_construct) BMARGS;
 BENCHMARK(BM_Matrix_typemat3x3f_transpose) BMARGS;
 BENCHMARK(BM_Matrix_eigenmat33_transpose) BMARGS;
 BENCHMARK(BM_Matrix_typemat3x3f_invert) BMARGS;
+BENCHMARK(BM_Matrix_typemat3x3d_invert) BMARGS;
+BENCHMARK(BM_Matrix_typemat6x6d_invert) BMARGS;
 BENCHMARK(BM_Matrix_eigenmat33_invert) BMARGS;
 BENCHMARK(BM_Matrix_typemat3x3f_determinant) BMARGS;
 BENCHMARK(BM_Matrix_eigenmat33_determinant) BMARGS;
@@ -431,6 +435,64 @@ void BM_Matrix_typemat3x3f_invert(benchmark::State& state)
                 sofa::type::Mat3x3f::LineNoInit{values[i * 9 + 3], values[i * 9 + 4], values[i * 9 + 5]},
                 sofa::type::Mat3x3f::LineNoInit{values[i * 9 + 6], values[i * 9 + 7], values[i * 9 + 8]}
             });
+    }
+
+    for (auto _ : state)
+    {
+        for (auto& mat : vc)
+        {
+            benchmark::DoNotOptimize(mat.inverted());
+        }
+    }
+}
+
+void BM_Matrix_typemat3x3d_invert(benchmark::State& state)
+{
+    constexpr auto totalsize = maxSubIterations * 9;
+    const std::array<double, totalsize>& values = RandomValuePool<double, totalsize>::get();
+
+    std::vector<sofa::type::Mat3x3d> vc;
+    vc.reserve(state.range(0));
+
+    for (std::size_t i = 0; i < state.range(0); i++)
+    {
+        sofa::type::Mat3x3d m;
+        for (std::size_t j = 0; j < 3; ++j)
+            for (std::size_t k = 0; k < 3; ++k)
+            {
+                m[j][k] = values[i * 9 + j * 3 + k];
+            }
+
+        vc.push_back(m);
+    }
+
+    for (auto _ : state)
+    {
+        for (auto& mat : vc)
+        {
+            benchmark::DoNotOptimize(mat.inverted());
+        }
+    }
+}
+
+void BM_Matrix_typemat6x6d_invert(benchmark::State& state)
+{
+    constexpr auto totalsize = maxSubIterations * 36;
+    const std::array<double, totalsize>& values = RandomValuePool<double, totalsize>::get();
+
+    std::vector<sofa::type::Mat6x6d> vc;
+    vc.reserve(state.range(0));
+
+    for (std::size_t i = 0; i < state.range(0); i++)
+    {
+        sofa::type::Mat6x6d m;
+        for(std::size_t j = 0; j < 6; ++j)
+            for (std::size_t k = 0; k < 6; ++k)
+            {
+                m[j][k] = values[i*36 + j * 6 + k];
+            }
+
+        vc.push_back(m);
     }
 
     for (auto _ : state)

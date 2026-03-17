@@ -21,12 +21,18 @@ static void BM_Vec_InitMemset(benchmark::State& state);
 static void BM_Vec_CopySimpleEqual(benchmark::State& state);
 static void BM_Vec_CopySimpleLoop(benchmark::State& state);
 static void BM_Vec_CopyStdCopy(benchmark::State& state);
+template <typename Container>
+static void BM_Vec_ConvertToVecNoop(benchmark::State& state);
+template <typename Container>
+static void BM_Vec_ConvertToVecIdentical(benchmark::State& state);
+template <typename FromContainer, typename ToContainer>
+static void BM_Vec_ConvertToVecDifferent(benchmark::State& state);
 
 using stdarray3f = std::array<float, 3>;
 using sofatypefixedarray3f = sofa::type::fixed_array<float, 3>;
 
-constexpr int64_t minSubIterations = 8 << 4;
-constexpr int64_t maxSubIterations = 8 << 6;
+constexpr int64_t minSubIterations = 8 << 14;
+constexpr int64_t maxSubIterations = 8 << 16;
 
 BENCHMARK(BM_Vec_dot)->RangeMultiplier(2)->Ranges({ {minSubIterations, maxSubIterations} })->Unit(benchmark::kMicrosecond);
 BENCHMARK_TEMPLATE1(BM_Vec_stdinnerproduct, stdarray3f)->RangeMultiplier(2)->Ranges({ {minSubIterations, maxSubIterations} })->Unit(benchmark::kMicrosecond);
@@ -37,6 +43,21 @@ BENCHMARK(BM_Vec_InitMemset)->RangeMultiplier(2)->Ranges({ {minSubIterations, ma
 BENCHMARK(BM_Vec_CopyStdCopy)->RangeMultiplier(2)->Ranges({ {minSubIterations, maxSubIterations} })->Unit(benchmark::kMicrosecond);
 BENCHMARK(BM_Vec_CopySimpleLoop)->RangeMultiplier(2)->Ranges({ {minSubIterations, maxSubIterations} })->Unit(benchmark::kMicrosecond);
 BENCHMARK(BM_Vec_CopySimpleEqual)->RangeMultiplier(2)->Ranges({ {minSubIterations, maxSubIterations} })->Unit(benchmark::kMicrosecond);
+BENCHMARK_TEMPLATE1(BM_Vec_ConvertToVecNoop, sofa::type::Vec3f)->RangeMultiplier(2)->Ranges({ {minSubIterations, maxSubIterations} })->Unit(benchmark::kMicrosecond);
+BENCHMARK_TEMPLATE1(BM_Vec_ConvertToVecNoop, sofa::type::Vec3d)->RangeMultiplier(2)->Ranges({ {minSubIterations, maxSubIterations} })->Unit(benchmark::kMicrosecond);
+BENCHMARK_TEMPLATE1(BM_Vec_ConvertToVecNoop, sofa::type::Vec6f)->RangeMultiplier(2)->Ranges({ {minSubIterations, maxSubIterations} })->Unit(benchmark::kMicrosecond);
+BENCHMARK_TEMPLATE1(BM_Vec_ConvertToVecNoop, sofa::type::Vec6d)->RangeMultiplier(2)->Ranges({ {minSubIterations, maxSubIterations} })->Unit(benchmark::kMicrosecond);
+BENCHMARK_TEMPLATE1(BM_Vec_ConvertToVecIdentical, sofa::type::Vec3f)->RangeMultiplier(2)->Ranges({ {minSubIterations, maxSubIterations} })->Unit(benchmark::kMicrosecond);
+BENCHMARK_TEMPLATE1(BM_Vec_ConvertToVecIdentical, sofa::type::Vec3d)->RangeMultiplier(2)->Ranges({ {minSubIterations, maxSubIterations} })->Unit(benchmark::kMicrosecond);
+BENCHMARK_TEMPLATE1(BM_Vec_ConvertToVecIdentical, sofa::type::Vec6f)->RangeMultiplier(2)->Ranges({ {minSubIterations, maxSubIterations} })->Unit(benchmark::kMicrosecond);
+BENCHMARK_TEMPLATE1(BM_Vec_ConvertToVecIdentical, sofa::type::Vec6d)->RangeMultiplier(2)->Ranges({ {minSubIterations, maxSubIterations} })->Unit(benchmark::kMicrosecond);
+BENCHMARK_TEMPLATE1(BM_Vec_ConvertToVecIdentical, sofa::type::Vec3i)->RangeMultiplier(2)->Ranges({ {minSubIterations, maxSubIterations} })->Unit(benchmark::kMicrosecond);
+BENCHMARK_TEMPLATE2(BM_Vec_ConvertToVecDifferent, sofa::type::Vec3d, sofa::type::Vec3f)->RangeMultiplier(2)->Ranges({ {minSubIterations, maxSubIterations} })->Unit(benchmark::kMicrosecond);
+BENCHMARK_TEMPLATE2(BM_Vec_ConvertToVecDifferent, sofa::type::Vec3f, sofa::type::Vec3d)->RangeMultiplier(2)->Ranges({ {minSubIterations, maxSubIterations} })->Unit(benchmark::kMicrosecond);
+BENCHMARK_TEMPLATE2(BM_Vec_ConvertToVecDifferent, sofa::type::Vec3d, sofa::type::Vec6d)->RangeMultiplier(2)->Ranges({ {minSubIterations, maxSubIterations} })->Unit(benchmark::kMicrosecond);
+BENCHMARK_TEMPLATE2(BM_Vec_ConvertToVecDifferent, sofa::type::Vec3d, sofa::type::Vec6f)->RangeMultiplier(2)->Ranges({ {minSubIterations, maxSubIterations} })->Unit(benchmark::kMicrosecond);
+BENCHMARK_TEMPLATE2(BM_Vec_ConvertToVecDifferent, sofa::type::Vec3d, sofa::type::Vec3i)->RangeMultiplier(2)->Ranges({ {minSubIterations, maxSubIterations} })->Unit(benchmark::kMicrosecond);
+BENCHMARK_TEMPLATE2(BM_Vec_ConvertToVecDifferent, sofa::type::Vec3d, sofa::type::Vec6i)->RangeMultiplier(2)->Ranges({ {minSubIterations, maxSubIterations} })->Unit(benchmark::kMicrosecond);
 
 // test on dot() for sofa::type::Vec
 void BM_Vec_dot(benchmark::State& state)
@@ -209,5 +230,96 @@ void BM_Vec_CopySimpleEqual(benchmark::State& state)
     for (auto _ : state)
     {
         b = list;
+    }
+}
+
+template<typename VectorContainer, typename Container = VectorContainer::value_type >
+void emplace_from_values(VectorContainer& list, const typename Container::value_type* values, std::size_t i)
+{
+    constexpr auto ContainerSize = Container::static_size;
+    
+    // Build an index sequence 0, 1, ..., ContainerSize-1
+    [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+        list.emplace_back(values[i * ContainerSize + Is]...);
+    }(std::make_index_sequence<ContainerSize>{});
+}
+
+template <typename Container>
+void BM_Vec_ConvertToVecNoop(benchmark::State& state)
+{
+    constexpr auto ContainerSize = Container::static_size;
+    constexpr auto totalsize = maxSubIterations * ContainerSize;
+    const auto& values = RandomValuePool<typename Container::value_type, totalsize>::get();
+
+    sofa::type::vector<Container> list;
+    list.reserve(state.range(0));
+
+    for (unsigned int i = 0; i < state.range(0); i++)
+    {
+        emplace_from_values(list, values.data(), ContainerSize);
+    }
+
+    for (auto _ : state)
+    {
+        typename Container::value_type sum{};
+        for (unsigned int i = 0; i < state.range(0); ++i)
+        {
+            sum += list[i][0];
+        }
+        benchmark::DoNotOptimize(sum);
+    }
+}
+
+template <typename Container>
+void BM_Vec_ConvertToVecIdentical(benchmark::State& state)
+{
+    constexpr auto ContainerSize = Container::static_size;
+    constexpr auto totalsize = maxSubIterations * ContainerSize;
+    const auto& values = RandomValuePool<typename Container::value_type, totalsize>::get();
+
+    sofa::type::vector<Container> list;
+    list.reserve(state.range(0));
+
+    for (unsigned int i = 0; i < state.range(0); i++)
+    {
+        emplace_from_values(list, values.data(), ContainerSize);
+    }
+
+    for (auto _ : state)
+    {
+        typename Container::value_type sum{};
+        for (unsigned int i = 0; i < state.range(0); ++i)
+        {
+            const auto v = sofa::type::toVecN<Container>(list[i]);
+            sum += v[0];
+        }
+        benchmark::DoNotOptimize(sum);
+    }
+}
+
+template <typename FromContainer, typename ToContainer>
+void BM_Vec_ConvertToVecDifferent(benchmark::State& state)
+{
+    constexpr auto FromContainerSize = FromContainer::static_size;
+    constexpr auto totalsize = maxSubIterations * FromContainerSize;
+    const auto& values = RandomValuePool<typename FromContainer::value_type, totalsize>::get();
+
+    sofa::type::vector<FromContainer> list;
+    list.reserve(state.range(0));
+
+    for (unsigned int i = 0; i < state.range(0); i++)
+    {
+        emplace_from_values(list, values.data(), FromContainerSize);
+    }
+
+    for (auto _ : state)
+    {
+        typename ToContainer::value_type sum{};
+        for (unsigned int i = 0; i < state.range(0); ++i)
+        {
+            const auto v = sofa::type::toVecN<ToContainer>(list[i]);
+            sum += v[0];
+        }
+        benchmark::DoNotOptimize(sum);
     }
 }
